@@ -1,10 +1,10 @@
 library(tidyverse)
 library(haven)
-library(feols)
+library(fixest)
 library(gt)
 
 # Table 1: Summary Statistics ----
-dat <- read_dta("data/main.dta")
+dat <- read_dta("data/final_main.dta")
 
 dat |> 
   select(EV, l2CPcol2, new_empinxavg, polity2avg, covihme_ayem, covwdi_exp, covwdi_fdi, covwdi_imp, covwvs_rel, coviNY_GDP_PETR_RT_ZS, covdemregion, covloggdp, covloggdpC) |> 
