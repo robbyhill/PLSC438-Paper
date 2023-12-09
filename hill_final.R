@@ -3,9 +3,20 @@ library(haven)
 library(fixest)
 library(gt)
 
-# Table 1: Summary Statistics ----
+# ---- Clean data
+## Read data
 dat <- read_dta("data/final_main.dta")
 
+## Choose variables with erroneous -99.0 values
+variables_to_replace <- c("covihme_ayem", "covwdi_exp", "covwdi_fdi", "covwdi_imp", 
+                          "covwvs_rel", "coviNY_GDP_PETR_RT_ZS", "covdemregion", 
+                          "covloggdpC", "covloggdp")
+
+## Mutate variables to replace -99.0 values with "NA"
+dat <- dat |> 
+  mutate_at(all_of(variables_to_replace), ~ replace(., . == -99, NA))
+
+# Table 1: Summary Statistics ----
 dat |> 
   select(EV, l2CPcol2, new_empinxavg, polity2avg, covihme_ayem, covwdi_exp, covwdi_fdi, covwdi_imp, covwvs_rel, coviNY_GDP_PETR_RT_ZS, covdemregion, covloggdp, covloggdpC) |> 
   pivot_longer(cols = everything()) |> 
@@ -56,6 +67,11 @@ dat |>
 
 
 # Table 2: Main Results ----
+dat <- dat |> 
+  mutate(
+    
+  )
+## First Stage Regression ----
 
 
 
