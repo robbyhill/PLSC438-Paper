@@ -2,6 +2,9 @@ library(tidyverse)
 library(haven)
 library(fixest)
 library(gt)
+library(stringr)
+library(glue)
+library(modelsummary)
 
 # ---- Clean data
 ## Read data
@@ -67,10 +70,49 @@ dat |>
 
 
 # Table 2: Main Results ----
-dat <- dat |> 
-  mutate(
-    
-  )
+## Create a vector of covariates for use in regression models
+## Regex matches all strings beginning with "cov" but not ending in "F". ChatGPT assisted.
+covs <- dat |> 
+  colnames() |> 
+  str_subset("^cov.*(?<!F)$") |> 
+  str_c(collapse = " + ")
+
+## Create vectors of country and year indicators to act as fixed effects
+country_fe <- dat |> 
+  colnames() |> 
+  str_subset("_Iccode") |> 
+  ## Wrap indicator variables in backticks for use in as.formula()
+  sapply(function(x) str_c("`", x, "`")) |> 
+  str_c(collapse = " + ")
+
+year_fe <- dat |> 
+  colnames() |> 
+  str_subset("_Iyear") |> 
+  ## Wrap indicator variables in backticks for use in as.formula()
+  sapply(function(x) str_c("`", x, "`")) |> 
+  str_c(collapse = " + ")
+
+## Subset data to only include years after 1986 
+dat_subset <- filter(dat, year >= 1987)
+
+## Define regression models
+mod1_form <- as.formula(glue("new_empinxavg ~ {country_fe} + {year_fe} | EV ~ l2CPcol2"))
+mod2_form <- as.formula(glue("new_empinxavg ~ {country_fe} + {year_fe} + {covs} | EV ~ l2CPcol2"))
+mod3_form <- update(mod1_form, polity2avg ~ .)
+mod4_form <- update(mod2_form, polity2avg ~ .)
+
+## Generate models
+mod1 <- feols(mod1_form, dat_subset, cluster = c("ccode", "year"))
+mod2 <- feols(mod2_form, dat_subset, cluster = c("ccode", "year"))
+mod3 <- feols(mod3_form, dat_susbset, cluster = c("ccode", "year"))
+mod4 <- feols(mod4_form, dat_subset, cluster = c("ccode", "year"))
+
+## Visualize models
+mods <- list(mod1, mod2, mod3, mod4)
+modelsummary(mods, 
+             coef_map = c(
+               fit_EV = "Effect of Aid"
+             ))
 ## First Stage Regression ----
 
 
