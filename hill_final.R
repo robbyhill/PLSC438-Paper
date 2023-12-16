@@ -5,8 +5,10 @@ library(gt)
 library(stringr)
 library(glue)
 library(modelsummary)
+library(kableExtra)
 
-# ---- Clean data
+
+# Data Cleaning -----------------------------------------------------------
 ## Read data
 dat <- read_dta("data/final_main.dta")
 
@@ -19,7 +21,8 @@ variables_to_replace <- c("covihme_ayem", "covwdi_exp", "covwdi_fdi", "covwdi_im
 dat <- dat |> 
   mutate_at(all_of(variables_to_replace), ~ replace(., . == -99, NA))
 
-# Table 1: Summary Statistics ----
+
+# Summary Statistics ------------------------------------------------------
 dat |> 
   select(EV, l2CPcol2, new_empinxavg, polity2avg, covihme_ayem, covwdi_exp, covwdi_fdi, covwdi_imp, covwvs_rel, coviNY_GDP_PETR_RT_ZS, covdemregion, covloggdp, covloggdpC) |> 
   pivot_longer(cols = everything()) |> 
@@ -69,12 +72,12 @@ dat |>
   gtsave("figures/sumstats.png")
 
 
-# Table 2: Main Results ----
+# Replication of Table 1 --------------------------------------------------
 ## Create a vector of covariates for use in regression models
-## Regex matches all strings beginning with "cov" but not ending in "F". ChatGPT assisted.
 covs <- dat |> 
   colnames() |> 
-  str_subset("^cov.*(?<!F)$") |> 
+  #str_subset("^cov.*(?<!F)$") |> 
+  str_subset("cov") |> 
   str_c(collapse = " + ")
 
 ## Create vectors of country and year indicators to act as fixed effects
@@ -98,27 +101,81 @@ dat_subset <- filter(dat, year >= 1987)
 ## Define regression models
 mod1_form <- as.formula(glue("new_empinxavg ~ {country_fe} + {year_fe} | EV ~ l2CPcol2"))
 mod2_form <- as.formula(glue("new_empinxavg ~ {country_fe} + {year_fe} + {covs} | EV ~ l2CPcol2"))
-mod3_form <- update(mod1_form, polity2avg ~ .)
-mod4_form <- update(mod2_form, polity2avg ~ .)
+mod3_form <- as.formula(glue("polity2avg ~ {country_fe} + {year_fe} | EV ~ l2CPcol2"))
+mod4_form <- as.formula(glue("polity2avg ~ {country_fe} + {year_fe} + {covs} | EV ~ l2CPcol2"))
 
 ## Generate models
 mod1 <- feols(mod1_form, dat_subset, cluster = c("ccode", "year"))
 mod2 <- feols(mod2_form, dat_subset, cluster = c("ccode", "year"))
-mod3 <- feols(mod3_form, dat_susbset, cluster = c("ccode", "year"))
+mod3 <- feols(mod3_form, dat_subset, cluster = c("ccode", "year"))
 mod4 <- feols(mod4_form, dat_subset, cluster = c("ccode", "year"))
 
-## Visualize models
-mods <- list(mod1, mod2, mod3, mod4)
-modelsummary(mods, 
-             coef_map = c(
-               fit_EV = "Effect of Aid"
-             ))
-## First Stage Regression ----
+## Calculate statistics to add to the bottom of the regression table
+## Each of the models includes different variables in the regression, so I filter
+## across those variables to check for missing values and then calculate the
+## number of countries and years included in the regression
+mod1_stats <- dat_subset |> 
+  filter(is.na(new_empinxavg) != TRUE) |> 
+  summarize(
+    years = n_distinct(year), 
+    countries = n_distinct(ccode)
+  )
+
+mod2_stats <- dat_subset |> 
+  filter(across(all_of(variables_to_replace), ~ !is.na(.))) |>
+  filter(is.na(new_empinxavg) != TRUE) |> 
+  summarize(
+    years = n_distinct(year), 
+    countries = n_distinct(ccode)
+  )
+
+mod3_stats <- dat_subset |> 
+  filter(is.na(polity2avg) != TRUE) |> 
+  summarize(
+    years = n_distinct(year), 
+    countries = n_distinct(ccode)
+  )
+
+mod4_stats <- dat_subset |> 
+  filter(across(all_of(variables_to_replace), ~ !is.na(.))) |>
+  filter(is.na(polity2avg) != TRUE) |> 
+  summarize(
+    years = n_distinct(year), 
+    countries = n_distinct(ccode)
+  )
+
+## Visualize regression table using modelsummary()
+models <- list(
+  "mod1" = mod1,
+  "mod2" = mod2,
+  "mod3" = mod3,
+  "mod4" = mod4
+)
+
+table1 <- modelsummary(models,
+             coef_map = c(fit_EV = "Effect of Aid"),
+             gof_map = c("nobs"), 
+             ## Hard code table data
+             add_rows = data.frame(
+               label = c("Countries", "Years", "Covariates", "Year Fixed Effects", "Country Fixed Effects"),
+               mod1 = c(mod1_stats$countries, mod1_stats$years, "No", "Yes", "Yes"),
+               mod2 = c(mod2_stats$countries, mod2_stats$years, "Yes", "Yes", "Yes"),
+               mod3 = c(mod3_stats$countries, mod3_stats$years, "No", "Yes", "Yes"),
+               mod4 = c(mod4_stats$countries, mod4_stats$years, "Yes", "Yes", "Yes")),
+             output = "gt")
+
+## Edit regression table using gt()
+table1 |> 
+  tab_spanner(label = "Dependent Variable (4-Year Average)", columns = 1, id = "spanner1") |> 
+  tab_spanner(label = "CIRI Human Empowerment Index", columns = c(mod1, mod2), id = "spanner2") |> 
+  tab_spanner(label = "Polity IV Combined Score", columns = c(mod3, mod4), id = "spanner3") |> 
+  tab_style(style = cell_text(weight = "bold"), locations = cells_column_spanners()) |> 
+  tab_style(style = cell_borders(sides = c("bottom"), weight = px(0)),
+            locations = cells_column_spanners()) |> 
+  cols_label(mod1 = "", 
+             mod2 = "", 
+             mod3 = "",
+             mod4 = "") 
 
 
-
-
-
-
-
-# Figure 1: Event Study Plot ----
+# Replication of Figure 1 -------------------------------------------------
