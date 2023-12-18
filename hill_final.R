@@ -69,13 +69,18 @@ dat_subset |>
   cols_label(
     name = "",
     mean = "Mean", 
-    sd = "Std. Dev."
+    sd = "Std. Dev.", 
+    n = "N"
   ) |> 
   fmt_number(columns = c(mean, sd), decimals = 2) |> 
   fmt_integer(columns = n) |> 
-  tab_style(style = cell_text(weight = "bold"), locations = cells_row_groups()) |> 
+  tab_style(style = cell_text(weight = "bold"), 
+            locations = cells_row_groups()) |> 
+  tab_style(style = cell_text(weight = "bold"), 
+            locations = cells_column_labels()) |> 
   opt_table_font(font = google_font("Lato")) |> 
-  gtsave("figures/sumstats.png")
+  tab_options(table_body.hlines.width = px(0)) |> 
+  gtsave(filename = "figures/sumstats.png")
 
 
 # Replication of Table 1 --------------------------------------------------
@@ -275,10 +280,7 @@ new_empinx_plot <- leads |>
        x = "Years Forward",
        y = "Effect of Foreign Aid")
 
-ggsave("figures/fig1a.png",
-       new_empinx_plot,
-       height = 3,
-       width = 3)
+ggsave("figures/fig1a.png", new_empinx_plot, height = 3, width = 3)
 
 ## Event study plot for polity2
 polity2_plot <- leads |>
@@ -312,9 +314,4 @@ polity2_plot <- leads |>
        y = "Effect of Foreign Aid")
 
 ## Save plot
-ggsave("figures/fig1b.png",
-       polity2_plot,
-       height = 3,
-       width = 3)
-
-
+ggsave("figures/fig1b.png", polity2_plot, height = 3, width = 3)
