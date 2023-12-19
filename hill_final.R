@@ -6,30 +6,117 @@ library(stringr)
 library(glue)
 library(modelsummary)
 library(showtext)
+library(giscoR)
+library(maps)
+library(ggthemes)
+library(panelView)
+library(ggpattern)
 
 # Data Cleaning -----------------------------------------------------------
 ## Read data
 dat <- read_dta("data/final_main.dta")
+nunn <- read_dta("data/nunn_qian.dta")
+prio <- read_csv("data/prio.csv")
+cow <- read_csv("data/cow_ccodes.csv")
+iso <- read_csv("data/cow2iso.csv")
+load("data/rugged.rda")
 
-## Choose variables with erroneous -99.0 values
-variables_to_replace <- c("covihme_ayem", "covwdi_exp", "covwdi_fdi", "covwdi_imp", 
-                          "covwvs_rel", "coviNY_GDP_PETR_RT_ZS", "covdemregion", 
-                          "covloggdpC", "covloggdp")
+## Clean UCDP/PRIO conflict data
+prio <- prio |> 
+  ## Exclude conflicts in Europe and those before Carnegie and Marinov's analysis
+  filter(year >= 1987 & region != 1) |> 
+  ## Remove secondary country names, which differ from names in dat_subset
+  mutate(location = gsub("\\([^\\)]+\\)", "", location)) |> 
+  ## Change certain variable names
+  mutate(location = case_when(
+    location == "DR Congo " ~ "Democratic Republic of the Congo", 
+    TRUE ~ str_trim(location)
+  )) |> 
+  ## For interstate conflicts, split up multiple participant countries
+  separate(location, into = paste0("location", 1:4), sep = ", ", fill = "right") |> 
+  pivot_longer(cols = starts_with("location"), 
+               names_to = "location_order", 
+               values_to = "location") |> 
+  ## Remove rows with no conflict
+  filter(!is.na(location)) |> 
+  ## Summarize data to merge later
+  group_by(year, location) |> 
+  summarize(
+    prio_conflict_count = n(),
+    prio_major_conflict_count = sum(intensity_level == 2),
+    prio_minor_conflict_count = sum(intensity_level == 1),
+    prio_any_conflict = as.numeric(prio_conflict_count >= 1),
+    prio_any_intra = as.numeric(sum(type_of_conflict != 2) > 0),
+    prio_any_inter = as.numeric(sum(type_of_conflict == 2) > 0),
+    prio_intra_intensity = sum((type_of_conflict != 2) * intensity_level),
+    prio_inter_intensity = sum((type_of_conflict == 2) * intensity_level),
+    prio_max_intensity = ifelse(max(intensity_level) == 2, 2, 1)
+  )
 
-## Mutate variables to replace -99.0 values with "NA"
-dat <- dat |> 
-  mutate_at(all_of(variables_to_replace), ~ replace(., . == -99, NA))
+## Store new UCDP/PRIO variables in a vector to clean
+prio_vars <- prio |> 
+  colnames() |> 
+  str_subset("prio_")
 
-## Subset data to only include years after 1986 as in Carnegie and Marinov 2017
-dat_subset <- filter(dat, year >= 1987)
+## Subset data to include only years after 1986 as in Carnegie and Marinov 2017
+dat_subset <- dat |>
+  filter(year >= 1987) |>
+  ## Left join CoW, CoW-to-ISO, and UCDP/PRIO data frames to dat_subset by country, year
+  left_join(distinct(cow, StateNme, CCode), by = c("ccode" = "CCode")) |>
+  rename(country = StateNme) |>
+  left_join(distinct(iso, cow_id, iso3), by = c("ccode" = "cow_id")) |>
+  left_join(distinct(rugged, ccode, rugged), by = "ccode") |> 
+  left_join(prio, by = c("country" = "location", "year")) |>
+  ## Replace NA values with 0s
+  mutate_at(all_of(prio_vars), ~ ifelse(is.na(.), 0, .)) |>
+  ## Create onset variables
+  ## Onset variable gets 1 iff prio_any_conflict == 1 in year t and != 1 in year t - 1
+  group_by(country) |>
+  mutate(
+    prio_conflict_onset = as.numeric(prio_any_conflict == 1 &
+                                       lag(prio_any_conflict, default = NA) != 1),
+    prio_intra_onset = as.numeric(prio_any_intra == 1 &
+                                    lag(prio_any_intra, default = NA) != 1),
+    prio_inter_onset = as.numeric(prio_any_inter == 1 &
+                                    lag(prio_any_inter, default = NA) != 1)
+  ) |> 
+  ungroup()
 
 ## Download fonts for use in figures and tables
 font_add_google(name = "Lato", family = "lato")
 showtext_auto()
 
 # Summary Statistics ------------------------------------------------------
-dat_subset |> 
-  select(EV, l2CPcol2, new_empinxavg, polity2avg, covihme_ayem, covwdi_exp, covwdi_fdi, covwdi_imp, covwvs_rel, coviNY_GDP_PETR_RT_ZS, covdemregion, covloggdp, covloggdpC) |> 
+## Clean covariates with erroneous -99.0 values
+covs <- dat_subset |> 
+  colnames() |> 
+  str_subset("cov")
+
+## Mutate variables to replace -99.0 values with "NA"
+dat_summary <- dat_subset |> 
+  mutate_at(all_of(covs), ~ replace(., . == -99, NA))
+
+## Summarize data
+dat_summary |> 
+  select(
+    EV,
+    l2CPcol2,
+    new_empinxavg,
+    polity2avg,
+    prio_any_conflict,
+    prio_any_inter, 
+    prio_any_intra, 
+    prio_conflict_onset,
+    covihme_ayem,
+    covwdi_exp,
+    covwdi_fdi,
+    covwdi_imp,
+    covwvs_rel,
+    coviNY_GDP_PETR_RT_ZS,
+    covdemregion,
+    covloggdp,
+    covloggdpC
+  ) |>
   pivot_longer(cols = everything()) |> 
   group_by(name) |> 
   summarize(
@@ -43,22 +130,30 @@ dat_subset |>
     l2CPcol2 = "Treatment", 
     new_empinxavg = "Outcome", 
     polity2avg = "Outcome",
+    prio_any_conflict = "Outcome",
+    prio_conflict_onset = "Outcome", 
+    prio_any_inter = "Outcome", 
+    prio_any_intra = "Outcome", 
     .default = "Covariate"
   )) |> 
   mutate(name = recode_factor(
     name,
     EV = "EU Aid", 
-    l2CPcol2 = "Proportion of countries with former colony status, time t - 2", 
+    l2CPcol2 = "Prop. of countries with former colony status, time t - 2", 
     new_empinxavg = "CIRI Human Empowerment Index (0 to 14), 4-year avg.", 
-    polity2avg = "Polity IV score (-10 to 10), 4-year avg.", 
-    covihme_ayem = "Avg. years education among men (Source: Gakidou et al. 2010)",
-    covwvs_rel = "Religiosity (Source: Alesina et al. 2003)", 
-    covdemregion = "Democracies in Region (Source: Marshall et al. 2002)", 
-    covloggdp = "Log(GDP) (Source: WDI 2014)", 
-    covloggdpC = "Log(GDP per capita) Source: WDI 2014)", 
-    covwdi_exp = "Log(exports) (Source: WDI 2014)", 
-    covwdi_imp = "Log(imports) (Source: WDI 2014)", 
-    covwdi_fdi = "Log(FDI) (Source: WDI 2014)", 
+    polity2avg = "Polity IV score (-10 to 10), 4-year avg.",
+    prio_any_conflict = "Any conflict (25+ deaths)", 
+    prio_any_intra = "Intrastate conflict", 
+    prio_any_inter = "Interstate conflict", 
+    prio_conflict_onset = "Conflict onset",
+    covihme_ayem = "Avg. years education among men",
+    covwvs_rel = "Religiosity score (0 to 10)", 
+    covdemregion = "Prop. of countries in region that are democracies", 
+    covloggdp = "Log(GDP) (2014 USD)", 
+    covloggdpC = "Log(GDP per capita) (2014 USD)", 
+    covwdi_exp = "Log(exports) (% of GDP)", 
+    covwdi_imp = "Log(imports) (% of GDP)", 
+    covwdi_fdi = "Log(FDI) (% of GDP)", 
     coviNY_GDP_PETR_RT_ZS = "Petroleum revenues (Source: WDI 2014)"
   )) |> 
   arrange(name) |>
@@ -80,26 +175,25 @@ dat_subset |>
             locations = cells_column_labels()) |> 
   opt_table_font(font = google_font("Lato")) |> 
   tab_options(table_body.hlines.width = px(0)) |> 
+  tab_source_note(
+    source_not = "Notes: An observation is a country and year. The sample includes 115 countries and covers the years 1987 to 2007."
+  ) |> 
   gtsave(filename = "figures/sumstats.png")
 
 
-# Replication of Table 1 --------------------------------------------------
+# Replication of Carnegie and Marinov Table 1 --------------------------------
 ## Create a vector of covariates for use in regression models
-covs <- dat |> 
-  colnames() |> 
-  #str_subset("^cov.*(?<!F)$") |> 
-  str_subset("cov") |> 
-  str_c(collapse = " + ")
+covs <- covs |> str_c(collapse = " + ")
 
 ## Create vector of indicator variables that act as TWFE
-indics <- dat |> 
+indics <- dat_subset |> 
   colnames() |> 
   str_subset("_I") |> 
   ## Wrap indicator variables in backticks for use in as.formula()
   sapply(function(x) str_c("`", x, "`")) |> 
   str_c(collapse = " + ")
 
-## Define IV/TWFE  models
+## Define IV/TWFE  replication models
 mod1_form <- as.formula(glue("new_empinxavg ~ {indics} | EV ~ l2CPcol2"))
 mod2_form <- as.formula(glue("new_empinxavg ~ {indics} + {covs} | EV ~ l2CPcol2"))
 mod3_form <- as.formula(glue("polity2avg ~ {indics} | EV ~ l2CPcol2"))
@@ -113,6 +207,42 @@ models <- list(
   "mod4" = feols(mod4_form, dat_subset, cluster = c("ccode", "year"))
 )
 
+# Conflict Data Analysis --------------------------------------------------
+## Democracy controls
+demos <- char("new_empinxavg + polity2avg")
+
+## Generate IV/TWFE regression formulas
+reg1_form <- as.formula(glue("prio_any_conflict ~ {indics} + {covs} + {demos} + EV"))
+reg2_form <- as.formula(glue("prio_any_conflict ~ {indics} + {covs} + {demos} | EV ~ l2CPcol2"))
+reg3_form <- as.formula(glue("prio_any_intra ~ {indics} + {covs} + {demos} + EV"))
+reg4_form <- as.formula(glue("prio_any_intra ~ {indics} + {covs} + {demos} | EV ~ l2CPcol2"))
+reg5_form <- as.formula(glue("prio_any_inter ~ {indics} + {covs} + {demos} + EV"))
+reg6_form <- as.formula(glue("prio_any_inter ~ {indics} + {covs} + {demos} | EV ~ l2CPcol2"))
+reg7_form <- as.formula(glue("prio_conflict_onset ~ {indics} + {covs} + {demos} + EV"))
+reg8_form <- as.formula(glue("prio_conflict_onset ~ {indics} + {covs} + {demos} | EV ~ l2CPcol2"))
+
+## Run regression
+regs <- list (
+  "reg1" = feols(reg1_form, dat_subset, cluster = c("country", "year")),
+  "reg2" = feols(reg2_form, dat_subset, cluster = c("country", "year")),
+  "reg3" = feols(reg3_form, dat_subset, cluster = c("country", "year")),
+  "reg4" = feols(reg4_form, dat_subset, cluster = c("country", "year")),
+  "reg5" = feols(reg5_form, dat_subset, cluster = c("country", "year")),
+  "reg6" = feols(reg6_form, dat_subset, cluster = c("country", "year")), 
+  "reg7" = feols(reg7_form, dat_subset, cluster = c("country", "year")),
+  "reg8" = feols(reg8_form, dat_subset, cluster = c("country", "year"))
+)
+
+## Visualize with modelsummary()
+modelsummary(
+  regs,
+  coef_map = c("EV" = "Effect of Aid",
+               "fit_EV" = "Effect of Aid"),
+  stars = TRUE, 
+  gof_map = ""
+)
+
+# Main Regression Visualization -------------------------------------------
 ## Calculate N, Countries, and Years in each regression 
 ## Define function to calculate statistics for filtered data
 summarize_data <- function(df) {
@@ -130,7 +260,7 @@ mod1_stats <- dat_subset |>
   summarize_data()
 
 mod2_stats <- dat_subset |> 
-  filter(across(all_of(variables_to_replace), ~ !is.na(.))) |>
+  filter(across(all_of(covs), ~ !is.na(.))) |>
   filter(is.na(new_empinxavg) != TRUE) |> 
   summarize_data()
 
@@ -139,7 +269,7 @@ mod3_stats <- dat_subset |>
   summarize_data()
 
 mod4_stats <- dat_subset |> 
-  filter(across(all_of(variables_to_replace), ~ !is.na(.))) |>
+  filter(across(all_of(covs), ~ !is.na(.))) |>
   filter(is.na(polity2avg) != TRUE) |> 
   summarize_data()
 
@@ -158,22 +288,57 @@ table1 <- modelsummary(models,
 
 ## Edit regression table using gt()
 table1 |> 
+  fmt_integer(rows = 8) |> 
   sub_values(columns = 1, rows = 2, values = "", replacement = "(Standard Error)") |> 
   tab_spanner(label = "Dependent Variable (4-Year Average)", columns = starts_with("mod"), level = 2) |> 
   tab_spanner(label = "CIRI Human Empowerment Index", columns = c(mod1, mod2), level = 1) |> 
   tab_spanner(label = "Polity IV Combined Score", columns = c(mod3, mod4), level = 1) |> 
   tab_style(style = cell_text(weight = "bold"), locations = cells_column_spanners()) |> 
-  tab_options(#column_labels.border.bottom.width = px(0), ## makes tab_spanner borders disappear
-              table_body.hlines.width = px(0)) |> 
+  tab_options(table_body.hlines.width = px(0)) |> 
   tab_style(
     style = "padding-right:125px",
     locations = cells_column_labels()
   ) |> 
   tab_options(column_labels.padding = px(10)) |> 
   cols_label(starts_with("mod") ~ "") |>
-  fmt_integer(rows = everything()) |> 
-  opt_table_font(font = google_font("Lato"))
+  opt_table_font(font = google_font("Lato")) |> 
   
+  
+
+# Extension Figure 1 ------------------------------------------------------
+## Get African countries shapefile data
+africa <- gisco_get_countries(region = "Africa")
+
+## Join with main data frame and map conflict incidence
+africa |>
+  left_join(dat_subset, by = c("ISO3_CODE" = "iso3")) |>
+  filter(year <= 2007) |>
+  mutate(prio_any_conflict = factor(
+    recode(prio_any_conflict,
+           "0" = "No conflict",
+           "1" = "Conflict"),
+    levels = c("Conflict", "No conflict")
+    
+  )) |>
+  ggplot(aes(fill = prio_any_conflict)) +
+  geom_sf() +
+  scale_fill_manual(values = c("No conflict" = "gray", "Conflict" = "#ed5151")) +
+  labs(fill = "",
+       caption = "Source: UCDP/PRIO Version 23.1") +
+  ## Use facet_wrap to track change in conflict incidence over time
+  facet_wrap( ~ year, nrow = 5) +
+  theme_map() +
+  theme(
+    legend.position = c(.72, .04),
+    legend.text = element_text(size = 20, family = "lato"),
+    strip.text = element_text(size = 20, family = "lato"),
+    plot.caption = element_text(size = 15, family = "lato")
+  )
+
+## Save image
+ggsave("figures/africa.png", width = 5, height = 5)
+
+
 
 # Replication of Figure 1 -------------------------------------------------
 ## Create new lead variables for new_empinxavg and polity2avg 
