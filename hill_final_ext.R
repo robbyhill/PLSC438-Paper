@@ -39,9 +39,9 @@ prio <- prio |>
     prio_major_conflict_count = sum(intensity_level == 2), 
     prio_minor_conflict_count = sum(intensity_level == 1), 
     prio_conflict_binary = as.numeric(prio_conflict_count >= 1), 
-    prio_any_intra = as.numeric(sum(type_of_conflict != 2) > 0), 
+    prio_any_intra = as.numeric(sum(type_of_conflict == 3) > 0), 
     prio_any_inter = as.numeric(sum(type_of_conflict == 2) > 0),
-    prio_intra_intensity = sum((type_of_conflict != 2) * intensity_level), 
+    prio_intra_intensity = sum((type_of_conflict == 3) * intensity_level), 
     prio_inter_intensity = sum((type_of_conflict == 2) * intensity_level), 
     prio_max_intensity = ifelse(max(intensity_level) == 2, 2, 1)
   )
