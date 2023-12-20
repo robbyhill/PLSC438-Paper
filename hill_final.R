@@ -9,7 +9,6 @@ library(showtext)
 library(giscoR)
 library(maps)
 library(ggthemes)
-library(crayon)
 
 # Data Cleaning -----------------------------------------------------------
 ## Read data
@@ -508,7 +507,7 @@ new_empinx_plot <- leads |>
        x = "Years Forward",
        y = "Effect of Foreign Aid")
 
-ggsave("figures/fig1a.png", new_empinx_plot, height = 3, width = 3)
+ggsave("paper/figures/fig1a.png", new_empinx_plot, height = 3, width = 3)
 
 ## Event study plot for polity2
 polity2_plot <- leads |>
@@ -542,4 +541,4 @@ polity2_plot <- leads |>
        y = "Effect of Foreign Aid")
 
 ## Save plot
-ggsave("figures/fig1b.png", polity2_plot, height = 3, width = 3)
+ggsave("paper/figures/fig1b.png", polity2_plot, height = 3, width = 3)
