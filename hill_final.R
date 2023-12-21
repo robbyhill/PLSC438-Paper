@@ -278,7 +278,7 @@ table1 <- table1 |>
   tab_options(table_body.hlines.width = px(0)) |> 
   cols_label(starts_with("mod") ~ "") |>
   opt_table_font(font = google_font("Lato")) |> 
-  tab_source_note(source_not = "Note: 'Covariates' include Average Years Education, Religiosity, Democracies in Region, Log GDP, Log GDP p.c., Log Exports, Log Imports, FDI, Petroleum Revenues, and the two-year lag of . Standard errors are clustered at the country and year levels. The first-stage coefficient on Colony is 0.160 (SE = 0.074) for the CIRI regression and 0.154 (SE = 0.087) for the Polity regression.")
+  tab_source_note(source_not = "Note: 'Covariates' include Average Years Education, Religiosity, Democracies in Region, Log GDP, Log GDP p.c., Log Exports, Log Imports, FDI, and Petroleum Revenues. Standard errors are clustered at the country and year levels. The first-stage coefficient on Colony is 0.160 (SE = 0.074) for the CIRI regression and 0.154 (SE = 0.087) for the Polity regression.")
 
 table1 |> gtsave("paper/tables/replication.tex")
 
@@ -350,8 +350,7 @@ table2 <- table2 |>
   tab_style(
     style = cell_text(align = "center"),
     locations = cells_column_labels(columns = everything())) |> 
-  tab_source_note(source_note = "Note: 'Covariates' include Average Years Education, Religiosity, Democracies in Region, Log GDP, Log GDP p.c., Log Exports, Log Imports, FDI, Petroleum Revenues, twice-lagged Polity IV score, and twice-lagged CIRI Human Empowerment score. Standard errors are clustered at the country and year levels.")
-
+  tab_source_note(source_note = "Note: 'Covariates' include Average Years Education, Religiosity, Democracies in Region, Log GDP, Log GDP p.c., Log Exports, Log Imports, FDI, Petroleum Revenues, twice-lagged Polity IV score, and twice-lagged CIRI Human Empowerment score. Standard errors are clustered at the country and year levels. First-stage coefficients on Colony are: for incidence, 0.139 (SE = 0.065); for onset, 0.136 (SE = 0.062); for offset, 0.125 (SE = 0.061).")
 table2 |> gtsave("paper/tables/extension.tex")
 
 # Figure 1: Small Multiples Map -------------------------------------------

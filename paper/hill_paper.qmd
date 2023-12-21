@@ -1,0 +1,111 @@
+---
+title: "Foreign Aid and Civil Conflict: Evidence from a Natural Experiment"
+author: "Robby Hill"
+format:
+  cmc-article-pdf:
+    fontsize: 12pt
+    margin-left: 1.5in
+    margin-right: 1.5in
+    margin-bottom: 1.2in
+    margin-top: 1.2in
+    keep-tex: true
+    fig-pos: 'tbp'
+    tbl-pos: 'tbp'
+    include-in-header: header.tex
+bibliography: bibliography.bib
+abstract: | 
+  This paper responds to research by @nunn_us_2014 that foreign aid increases the incidence and duration of civil conflict in recipient countries. Following @carnegie_foreign_2017, I exploit an exogenous source of variation in foreign aid allocation: the rotating presidency of the Council of the European Union. I replicate their findings that countries holding the Council presidency allocate significantly more aid to their former colonies. Using a binary variable indicating former colony status as my instrument, I find negative effects of aid allocation on civil conflict incidence and duration in recipient countries. While these effects fall short of statistical significance, they are larger in magnitude than the uninstrumented results, and they provide suggestive evidence of the ability of foreign aid to promote peace.^[All replication data and scripts are available at <https://github.com/robbyhill/PLSC438-Paper>. I would like to thank the entire teaching team of PLSC 438: Applied Quantitative Research Design for their assistance throughout this course and in producing this paper.]
+---
+
+# Introduction
+
+Following a period of decline in the 1990s, the number of conflicts has increased dramatically in the twenty-first century.[^2] In response, researchers have investigated the role that foreign and humanitarian aid play in conflict settings. Classical problems of endogeneity complicate this task. Because more aid may be directed to countries that are in an active conflict, there is the potential for reverse causality. Further, foreign aid allocation may be negatively correlated with factors such as economic development and democracy, which reduce the likelihood of conflict and thus bias any causal estimate.
+
+[^2]: "Civil War Trends and the Changing Nature of Armed Conflict." *unu.edu*. <https://unu.edu/cpr/project/civil-war-trends-and-changing-nature-armed-conflict>.
+
+
+This paper attempts to overcome this problem of endogeneity by employing a rigorous research design: the use of a natural experiment affecting foreign aid allocation. Following @carnegie_foreign_2017, I exploit quasi-random variation in aid allocation that results from the structure of the European Union Council presidency. From the Council's inception until 2007, EU member states cycled through control of the presidency every six months according to a pre-determined order. As @carnegie_foreign_2017 find, and as I replicate, when a given country holds the presidency in the second half of year $t-1$, it tends to favor its former colonies in the distribution of EU official development assistance (ODA) in year $t$. Because it is as good as random whether a country receiving ODA is a former colony of the EU Council president, lagged former colony status can serve as a valid instrument for ODA in the first stage.
+
+Employing a 2SLS regression analysis, I find consistently negative effects of foreign aid on the incidence of all conflicts, conflict onset, and conflict duration. Although these effects are statistically insignificant, I compare them to the results from the OLS regressions of conflict on foreign aid, and I show that the 2SLS estimates are larger in magnitude, providing suggestive evidence of the causal role of foreign aid in the prevention of conflict.
+
+This paper meaningfully contributes to the literature in several ways. First, I compare my findings to one of the most widely-cited studies on the topic, @nunn_us_2014's analysis of the effect of US food aid on conflict. Using an instrumental variables approach, the authors argue that US food aid increases the incidence and duration of civil conflict. They instrument for food aid using an interacted term, $P_{t-1} \times \overline D_{ir}$, where $P_{t-1}$ is lagged US wheat production and $\overline D_{ir}$ is the likelihood that country $i$ in region $r$ receives US wheat aid. Their main results suggest that for a country receiving the mean level of US wheat aid, a 10 percent increase in aid causes a 0.70 percentage point increase in civil conflict incidence.
+
+However, their analysis remains susceptible to bias. As @christian_revisiting_2017 show, while the former authors' use of lagged US wheat production is potentially exogenous, the interaction with an *endogenous* exposure variable can still lead to spurious correlations between food aid and civil conflict, producing a biased estimate. Compared to @nunn_us_2014, my natural experiment setup offers greater internal validity, and my negative estimates of the effect of foreign aid on conflict incidence and duration cast doubt on their positive results. Determining the sign of the effect poses important implications for policymakers, who might otherwise risk halting foreign aid out of concern that it will exacerbate conflict.
+
+More generally, scholars have highlighted the need for better causal inference strategies when studying the effect of foreign aid on conflict [@findley_does_2018; @koppenberg_food_2023]. This paper accomplishes that task, and it lends support to other studies arguing that ODA either decreases or has little effect on conflict [e.g., @collier_greed_2004; @de_ree_aiding_2009].
+
+# Empirical Strategy
+
+## Data
+
+I construct the primary outcome of interest, conflict incidence, using data from the UCDP/PRIO Armed Conflict Dataset Version 23.1, which tracks the occurrence of conflict from 1946 to 2022.[^3] I generate two new outcomes, "conflict onset" and "conflict offset," which are binary variables equal to one if there is the presence/absence of conflict in year $t$ after the absence/presence of conflict in year $t - 1$. Following @nunn_us_2014, I interpret a decrease in conflict offset as an increase in conflict duration. All other variables included in the main results---including the human empowerment index from the CIRI Human Rights Dataset, Polivy IV combined score, EU aid disbursement, colony status, and covariates---come from @carnegie_foreign_2017. 
+
+[^3]: UCDP/PRIO define a conflict as the use of armed force resulting in 25 or more battle-related deaths, where at least one party to the conflict is a state government. To access data, see <https://ucdp.uu.se/downloads/>
+
+```{=tex}
+\begin{table}
+\caption{\textbf{Descriptive Statistics}}
+\label{sumstats}
+\input{tables/sumstats.tex}
+\end{table}
+```
+Table \ref{sumstats} presents descriptive statistics of the main variables in the analysis. In a given year, about 10 percent of the countries in the sample are former colonies of the country holding the EU Council presidency. Furthermore, an average of 17 percent of countries experience a conflict in a given year. On average, about 3 percent of countries transition into or out of a period of conflict each year. 
+
+![Conflict Incidence Among African Countries Receiving EU Aid, 1987-2007](figures/africa.png){#fig-africa}
+
+Focusing on a subset of countries helps make sense of the scope of the data. @fig-africa visualizes the variation in conflict incidence from 1987 to 2007 in Africa. Over the time period, almost all African countries receive EU aid, and many experience conflict. In my analysis, African countries make up over 40 percent of the full sample, and they have a slightly higher average conflict incidence than the mean across all countries (21 percent vs. 17 percent).
+
+## Methodology
+
+I am interested in estimating the following models: $$C_{it} = \beta_0 + \beta_1\log(\mathit{ODA}_{i(t-1)}) + \mathbf{X}_{it}\Gamma + \sum_{k\in K}\beta_k\mathbf{I}(i = k) + \sum_{j\in J}\beta_j\mathbf{I}(t = j) + u_{it},$${#eq-1} $$\log(\mathit{ODA}_{i(t-1)}) = \gamma_0 + \gamma_1Colony_{i(t-2)2} + \mathbf{X}_{it}\Gamma +\sum_{k\in K}\gamma_k\mathbf{I}(i = k) + \sum_{j\in J}\gamma_j\mathbf{I}(t = j) + e_{it},$${#eq-2} where Equation 1 is the reduced form and Equation 2 is the first stage of the 2SLS analysis. My specification is almost identical to @carnegie_foreign_2017, except that I am interested in the outcome $C_{it}$, a binary variable indicating whether country $i$ in year $t$ experienced any incidence of conflict, conflict onset, or conflict offset, depending on the specification.[^4] Furthermore, I include a vector of covariates, $\mathbf{X}_{it}$ in all specifications. The employ all the covariates used in @carnegie_foreign_2017, and I add two new variables: twice-lagged CIRI Human Empowerment Index scores and Polity IV scores. I include these based on findings by @fearon_ethnicity_2003, who find that respect for human rights and democracy are both correlated with conflict. The explanatory variable, $\mathit{ODA}_{i(t-1)}$ is the one-year lag of foreign aid received by country $i$. The variables denoted by $\mathbf{I}$ are indicators, making the summations equivalent to country and year fixed effects.
+
+In the first stage regression, $Colony_{i(t-2)2}$ is a binary variable that is 1 if the aid-receiving country is a former colony of the country holding the EU presidency in the second half of year $t-2$. $Colony_{i(t-2)2}$ generates predicted values for $\log(\mathit{ODA}_{i(t-1)})$, and for the instrumental variables approach to produce a causal estimate of the effect of foreign aid on conflict, two conditions must be met. First, the relevance condition states that the instrument, $Colony_{i(t-2)2}$, must be correlated with the explanatory variable of interest, $\mathit{ODA}_{i(t-1)}$. Second, the exclusion restriction requires that the instrument must affect the outcome $C_{it}$ only through its effect on $\mathit{ODA}_{i(t-1)}$. Although I later find support for the relevance condition by finding $\gamma_1$ to be large and significant in the first stage, the exclusion condition is untestable.
+
+@carnegie_foreign_2017 offer qualitative evidence to justify meeting the exclusion restriction, and although they consider a different outcome variable, their findings still hold in this context. The authors argue that despite EU Council presidents exerting influence over the foreign aid budget, they posses "few formal powers" and their "influence in other domains is severely limited" [@carnegie_foreign_2017, p. 674]. Furthermore, presidents cannot control the final disbursement of EU aid. Even though my outcome of interest differs, the Council president's limited, primarily budgetary role suggests that the country holding the presidency would be unlikely to influence conflict directly, or to influence other factors such as economic development, but for its effect on EU aid allocation. 
+
+[^4]: @carnegie_foreign_2017 instead use $DV_{it}$ as their dependent variable in the reduced form, which is either the CIRI Human Empowerment Index score or Polity IV score for country $i$ in year $t$.
+
+# Results
+## Replication
+
+```{=tex}
+\begin{table}
+\caption{\textbf{Replication of Carnegie and Marinov (2017) - Effect of EU Aid on Human Rights and Democracy Promotion}}
+\label{rep-reg}
+\input{tables/replication.tex}
+\end{table}
+```
+I present the results of the @carnegie_foreign_2017 replication in Table \ref{rep-reg}. Like the authors, I find that the instrument satisfies the relevance condition: the coefficient on $Colony_{i(t-2)2}$ in the first regression is large and significant ($\gamma$ = 0.160, SE = 0.074). Interpreting this effect substantively, this result implies that going from being a non-former colony to a former colony leads to a 16 percent increase in aid allocation. For a country otherwise receiving roughly the mean aid amount of 20 million dollars [@carnegie_foreign_2017, p. 678], this is equivalent to an increase in 3.2 million dollars of aid. 
+
+Further, I am able to replicate the authors' main point estimates, but I produce different standard errors despite clustering at the country and year levels. As a result of the larger standard errors, the coefficients on  $\log(\mathit{ODA}_{i(t-1)})$ are only statistically significant at the 5 percent level for the models with averaged Polity IV score as the dependent variable. The averaged CIRI Human Empowerment Index models, on the other hand, are significant at the 10 percent level. Still, to interpret Column 1 substantively, the results suggest that for a country receiving 20 million dollars in aid, a 20 percent increase in aid (i.e., 5 million dollars) improves the country's CIRI Human Empowerment Index score by 0.47 points. In the Appendix, I replicate the authors' Figure 1, in which I also find that the effect of foreign aid decays over time for the CIRI dependent variable and follows an inverted U-shape for the Polity IV dependent variable. In column 3 using averaged Polity IV score as the dependent variable, the results suggest that going from 20 million dollars in aid to 25 million dollars improves the Polity score by 0.51.
+
+## Extension 
+
+Table \ref{ext-reg} presents my main results. I consider the effect of EU aid on conflict incidence, onset, and offset. In the first stage for each of the three 2SLS regressions, the coefficient on $Colony_{i(t-2)2}$ is statistically significant. Despite the relevance of the instrument, none of the coefficients on $\log(\mathit{ODA}_{i(t-1)})$ are statistically significant in the 2SLS models. Still, I compare these results alongside the OLS regressions, where I consider only the reduced form. In all cases except onset, instrumenting for $\log(\mathit{ODA}_{i(t-1)})$ with $Colony_{i(t-2)2}$ increases the magnitude of the point estimate in absolute value terms. The notable exception is the regression of conflict onset. In that case, the results are virtually unchanged. 
+
+With the other two dependent variables, however, instrumenting for EU aid moves the point estimate in the *opposite* direction that @nunn_us_2014 find. For example, the 2SLS regression of conflict incidence as the dependent variable finds that a one log-unit increase in foreign aid in year $t-1$ decreases the likelihood of conflict in year $t$ by 6.7 percentage points. In substantive terms, for a country receiving the mean EU aid amount of twenty million dollars, a five million dollar increase in aid decreases conflict incidence by about 1.7 percentage points. This effect is larger than the OLS estimate, for which the same increase in aid produces around a 1.1 percentage point decrease, and it contradicts @nunn_us_2014's findings that US food aid increases conflict incidence. 
+```{=tex}
+\begin{table}
+\caption{\textbf{Effect of EU Aid on Measures of Conflict}}
+\label{ext-reg}
+\input{tables/extension.tex}
+\end{table}
+```
+The results with conflict offset as the dependent variable are even more striking. Although the OLS estimate is negative, instrumenting for EU aid creates a strongly *positive* effect of aid on conflict offset. These findings suggest that for a country receiving 20 million dollars in EU aid, an increase of 5 million dollars increases conflict offset by about 6.9 percentage points. If we consider conflict offset as one measure of duration, these findings provide strongly suggestive evidence that aid decreases conflict duration. In contrast, @nunn_us_2014 find the opposite effect, i.e., that aid decreases conflict offset and increases duration. 
+
+Although the regressions with conflict onset as the dependent variable do not show a strong effect of EU aid in reducing onset, at the very least, they do not contradict the findings of @nunn_us_2014, who find no significant effects of US food aid on conflict. Of course, the failure to produce significant results across my 2SLS specifications is disappointing. But at the very least, the comparison to the OLS regressions shows that exogenous variation in foreign aid tends to produce more negative results in conflict incidence and duration, casting doubt on @nunn_us_2014 and should give policymakers confidence that aid distribution will not exacerbate conflict. 
+
+# Conclusion
+In conclusion, this study calls to question the findings of @nunn_us_2014 regarding the relationship between foreign aid and civil conflict in recipient countries. Building on the work of @carnegie_foreign_2017, the analysis leverages the exogenous variation in foreign aid allocation associated with the rotating presidency of the Council of the European Union. Replicating the observed pattern that countries holding the Council presidency allocate more aid to their former colonies, former colony status is used to instrument for EU aid allocation in the first stage. The results reveal negative, though statistically insignificant, effects of aid allocation on both the incidence and duration of civil conflict in recipient countries. Notably, these effects, while inconclusive, exhibit greater magnitudes than the uninstrumented results, offering suggestive evidence for the potential of foreign aid to contribute to the promotion of peace in conflict-prone regions.
+
+Most importantly, this paper presents a more optimistic outlook about the ability of foreign aid to prevent conflict. For policymakers, this poses important implications. In face of some research that suggests the correct approach is to halt aid, this paper argues, and finds support for, the opposite. 
+
+::: {#refs}
+:::
+
+# Appendix {.appendix}
+::: {layout-ncol=2}
+![Replication of Carnegie and Marinov (2017) Figure 1: Estimated Effects of Logged Foreign Aid in Year t - 1 on CIRI and Polity IV Combined Scores in Years t Through t + 5](figures/fig1a.png)
+
+![](figures/fig1a.png)
+:::
